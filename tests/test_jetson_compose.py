@@ -90,3 +90,9 @@ def test_jetson_compose_limits_gpu_to_compute_workers():
     # two compute workers explicitly opt in, unlike the API/import stack.
     assert compose.count("runtime: nvidia") == 2
     assert compose.count("NVIDIA_VISIBLE_DEVICES: all") == 2
+
+
+def test_dockerfile_runs_wheel_helper_without_requiring_host_execute_bits():
+    dockerfile = (ROOT / "Dockerfile.jetson").read_text()
+    assert "sh /usr/local/bin/fetch-jetson-wheel /tmp/torch.whl" in dockerfile
+    assert "sh /usr/local/bin/fetch-jetson-wheel /tmp/torchvision.whl" in dockerfile

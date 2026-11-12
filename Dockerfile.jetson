@@ -42,10 +42,10 @@ COPY scripts/fetch-jetson-wheel.sh /usr/local/bin/fetch-jetson-wheel
 RUN set -eu; \
     ${PYTHON_BIN} -m pip install --upgrade 'pip<25' 'setuptools<82' wheel; \
     if [ -n "${NUMPY_VERSION}" ]; then ${PYTHON_BIN} -m pip install "numpy==${NUMPY_VERSION}"; fi; \
-    /usr/local/bin/fetch-jetson-wheel /tmp/torch.whl "${TORCH_WHEEL_URLS}"; \
+    sh /usr/local/bin/fetch-jetson-wheel /tmp/torch.whl "${TORCH_WHEEL_URLS}"; \
     ${PYTHON_BIN} -m pip install /tmp/torch.whl; \
     rm -f /tmp/torch.whl; \
-    /usr/local/bin/fetch-jetson-wheel /tmp/torchvision.whl "${TORCHVISION_WHEEL_URLS}"; \
+    sh /usr/local/bin/fetch-jetson-wheel /tmp/torchvision.whl "${TORCHVISION_WHEEL_URLS}"; \
     ${PYTHON_BIN} -m pip install /tmp/torchvision.whl; \
     rm -f /tmp/torchvision.whl; \
     if [ "${CUSPARSELT_REQUIRED}" = "1" ] && ! ldconfig -p | grep -q libcusparseLt; then \
