@@ -1,0 +1,151 @@
+# Use through ./scripts/jetson-compose.sh so build arguments match host L4T.
+x-jetson-build: &jetson-build
+  context: .
+  dockerfile: Dockerfile.jetson
+  args:
+    L4T_BASE: ${L4T_BASE:?Run via scripts/jetson-compose.sh}
+    PYTHON_BIN: ${JETSON_PYTHON:?Run via scripts/jetson-compose.sh}
+    NUMPY_VERSION: ${NUMPY_VERSION}
+    TORCH_WHEEL_URLS: ${TORCH_WHEEL_URLS:?Run via scripts/jetson-compose.sh}
+    TORCHVISION_WHEEL_URLS: ${TORCHVISION_WHEEL_URLS:?Run via scripts/jetson-compose.sh}
+    CUSPARSELT_REQUIRED: ${CUSPARSELT_REQUIRED:?Run via scripts/jetson-compose.sh}
+    CUDA_VERSION: ${CUDA_VERSION:?Run via scripts/jetson-compose.sh}
+
+x-app-environment: &app-environment
+  REDIS_URL: redis://redis:6379/0
+  UPLOAD_DIR: /data/uploads
+  TABULAR_DATASET_DIR: /data/tabular/datasets
+  TABULAR_MODEL_DIR: /data/tabular/models
+  MONGODB_URL: mongodb://mongodb:27017
+  COCO_DATABASE: tnb_inference
+  COCO_DATA_DIR: /data/coco
+  VIEWER_DATABASE: tnb_inference
+  VIEWER_DATA_DIR: /data/viewer
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongodb:
+    image: mongo:7.0.41-jammy
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: simple-inference-jetson
+    build: *jetson-build
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment: *app-environment
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: simple-inference-jetson
+    build: *jetson-build
+    command: python3 -m app.run_worker
+    environment:
+      <<: *app-environment
+      SCORE_THRESHOLD: "0.5"
+      INFERENCE_DEVICE: cuda
+      TORCH_HOME: /models
+      PYTORCH_NVML_BASED_CUDA_CHECK: "1"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - ./data:/data
+      - torch-model-cache:/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    runtime: nvidia
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'from app.queueing import has_inference_worker, redis_connection; raise SystemExit(0 if has_inference_worker(redis_connection()) else 1)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  training-worker:
+    image: simple-inference-jetson
+    build: *jetson-build
+    command: python3 -m app.run_training_worker
+    environment:
+      <<: *app-environment
+      INFERENCE_DEVICE: cuda
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    runtime: nvidia
+
+  cleanup:
+    image: simple-inference-jetson
+    build: *jetson-build
+    command: python3 -m app.cleanup
+    environment:
+      UPLOAD_DIR: /data/uploads
+      TABULAR_DATASET_DIR: /data/tabular/datasets
+      UPLOAD_RETENTION_SECONDS: "86400"
+      CLEANUP_INTERVAL_SECONDS: "3600"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  coco-worker:
+    image: simple-inference-jetson
+    build: *jetson-build
+    command: python3 -m app.run_coco_worker
+    environment: *app-environment
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  viewer-worker:
+    image: simple-inference-jetson
+    build: *jetson-build
+    command: python3 -m app.run_viewer_worker
+    environment: *app-environment
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  torch-model-cache:
+  mongo-data:

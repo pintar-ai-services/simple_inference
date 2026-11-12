@@ -69,6 +69,54 @@ The normal command is CPU-only. For an NVIDIA GPU, install the [NVIDIA Container
 docker compose -f compose.yaml -f compose.gpu.yaml up --build
 ```
 
+## NVIDIA Jetson deployment
+
+Use the Jetson-specific stack when building directly on an ARM64 Jetson. It
+selects the NVIDIA-compatible base image and the exact PyTorch/Torchvision wheel pair from
+the host's `/etc/nv_tegra_release`; it never uses the desktop CUDA wheels.
+
+Install Docker, Docker Compose, and NVIDIA Container Toolkit on the Jetson,
+then run from this repository:
+
+```bash
+./scripts/jetson-compose.sh up --build
+```
+
+Only the inference and training workers use the NVIDIA runtime; the API and
+import services do not reserve GPU access.
+
+The command starts the full stack and exposes the application at port 8000.
+The first build downloads PyTorch and the first inference request downloads the
+public model weights, so allow several GB of free storage and a stable network
+connection. Application data remains in `./data` and downloaded model weights
+are kept in the `torch-model-cache` volume.
+
+Supported native builds follow the Jetson launcher wheel matrix:
+
+| JetPack / L4T | PyTorch stack |
+| --- | --- |
+| 6.0 / 36.2 or 36.3 | Torch 2.3.0 + Torchvision 0.18.0a0 |
+| 6.2 and patch releases / 36.4.3, 36.4.4, 36.5.0, or 36.5.2 | Torch 2.8.0 + Torchvision 0.23.0 |
+| 7.2 and patch releases / 39.2.1 | Torch 2.14.1 + Torchvision 0.29.1 |
+
+JetPack 5 and JetPack 6.1 fail before the image build: their launcher wheel
+sets do not provide the Python/runtime or verified Torchvision compatibility
+required by this project. For JetPack 6 wheels, the installer tries the managed
+`jetson-assets` mirror first and then the launcher-recorded upstream URL.
+
+After the stack is healthy, verify CUDA inside the GPU worker:
+
+```bash
+./scripts/jetson-compose.sh exec worker python3 -c 'import torch, torchvision; print(torch.__version__, torchvision.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0))'
+```
+
+For diagnostics without invoking Docker, point the resolver at the actual
+release file (or a copied one) and print the selected configuration:
+
+```bash
+./scripts/jetson-compose.sh --print-env
+```
+
 ## Development tests
 
 ```bash
