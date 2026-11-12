@@ -82,6 +82,15 @@ then run from this repository:
 ./scripts/jetson-compose.sh up --build
 ```
 
+The wrapper directs Compose build metadata away from a potentially small
+`/tmp` tmpfs and into `.tmp/jetson-compose`. If the repository is itself on a
+space-constrained filesystem, set `JETSON_TMPDIR` to a writable directory on a
+larger persistent mount:
+
+```bash
+JETSON_TMPDIR=/mnt/ssd/compose-tmp ./scripts/jetson-compose.sh up --build
+```
+
 Only the inference and training workers use the NVIDIA runtime; the API and
 import services do not reserve GPU access.
 

@@ -102,3 +102,9 @@ def test_dockerfile_runs_wheel_helper_without_requiring_host_execute_bits():
     dockerfile = (ROOT / "Dockerfile.jetson").read_text()
     assert 'sh /usr/local/bin/fetch-jetson-wheel /tmp "${TORCH_WHEEL_FILENAME}"' in dockerfile
     assert 'sh /usr/local/bin/fetch-jetson-wheel /tmp "${TORCHVISION_WHEEL_FILENAME}"' in dockerfile
+
+
+def test_jetson_wrapper_uses_persistent_temp_storage_for_compose_metadata():
+    resolver = RESOLVER.read_text()
+    assert 'JETSON_TMPDIR:-${project_dir}/.tmp/jetson-compose' in resolver
+    assert 'export TMPDIR="$compose_tmpdir"' in resolver

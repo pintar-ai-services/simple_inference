@@ -7,3 +7,4 @@ data/tabular/datasets/*
 data/tabular/models/*
 data/coco/
 data/viewer/
+.tmp/

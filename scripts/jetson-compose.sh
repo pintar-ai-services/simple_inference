@@ -101,6 +101,10 @@ resolve_jetson() {
 }
 
 main() {
+  local project_dir
+  project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  cd "$project_dir"
+
   local release_file="${JETSON_RELEASE_FILE:-$DEFAULT_RELEASE_FILE}"
   [[ -r "$release_file" ]] || die "cannot read ${release_file}; run this on a flashed Jetson or set JETSON_RELEASE_FILE for diagnostics."
   local l4t_version
@@ -112,6 +116,15 @@ main() {
       "$l4t_version" "$JETPACK_VERSION" "$L4T_BASE" "$CUDA_VERSION" "$NUMPY_VERSION" "$CUSPARSELT_REQUIRED" "$TORCH_WHEEL_FILENAME" "$TORCHVISION_WHEEL_FILENAME"
     return
   fi
+
+  # Docker Compose uses the process temporary directory for BuildKit metadata.
+  # On Jetson, /tmp is often a small tmpfs even when the root disk has ample
+  # capacity, so default it to persistent project storage.  Operators can
+  # point JETSON_TMPDIR at a larger mounted disk when needed.
+  local compose_tmpdir="${JETSON_TMPDIR:-${project_dir}/.tmp/jetson-compose}"
+  mkdir -p "$compose_tmpdir"
+  [[ -w "$compose_tmpdir" ]] || die "temporary directory is not writable: ${compose_tmpdir}"
+  export TMPDIR="$compose_tmpdir"
 
   export L4T_BASE JETSON_PYTHON NUMPY_VERSION TORCH_WHEEL_FILENAME TORCH_WHEEL_URLS TORCHVISION_WHEEL_FILENAME TORCHVISION_WHEEL_URLS CUSPARSELT_REQUIRED CUDA_VERSION
   exec docker compose -f compose.jetson.yaml "$@"
