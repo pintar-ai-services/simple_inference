@@ -6,7 +6,9 @@ FROM ${L4T_BASE}
 
 ARG PYTHON_BIN=python3
 ARG NUMPY_VERSION=
+ARG TORCH_WHEEL_FILENAME
 ARG TORCH_WHEEL_URLS
+ARG TORCHVISION_WHEEL_FILENAME
 ARG TORCHVISION_WHEEL_URLS
 ARG CUSPARSELT_REQUIRED=0
 ARG CUDA_VERSION
@@ -42,12 +44,12 @@ COPY scripts/fetch-jetson-wheel.sh /usr/local/bin/fetch-jetson-wheel
 RUN set -eu; \
     ${PYTHON_BIN} -m pip install --upgrade 'pip<25' 'setuptools<82' wheel; \
     if [ -n "${NUMPY_VERSION}" ]; then ${PYTHON_BIN} -m pip install "numpy==${NUMPY_VERSION}"; fi; \
-    sh /usr/local/bin/fetch-jetson-wheel /tmp/torch.whl "${TORCH_WHEEL_URLS}"; \
-    ${PYTHON_BIN} -m pip install /tmp/torch.whl; \
-    rm -f /tmp/torch.whl; \
-    sh /usr/local/bin/fetch-jetson-wheel /tmp/torchvision.whl "${TORCHVISION_WHEEL_URLS}"; \
-    ${PYTHON_BIN} -m pip install /tmp/torchvision.whl; \
-    rm -f /tmp/torchvision.whl; \
+    sh /usr/local/bin/fetch-jetson-wheel /tmp "${TORCH_WHEEL_FILENAME}" "${TORCH_WHEEL_URLS}"; \
+    ${PYTHON_BIN} -m pip install "/tmp/${TORCH_WHEEL_FILENAME}"; \
+    rm -f "/tmp/${TORCH_WHEEL_FILENAME}"; \
+    sh /usr/local/bin/fetch-jetson-wheel /tmp "${TORCHVISION_WHEEL_FILENAME}" "${TORCHVISION_WHEEL_URLS}"; \
+    ${PYTHON_BIN} -m pip install "/tmp/${TORCHVISION_WHEEL_FILENAME}"; \
+    rm -f "/tmp/${TORCHVISION_WHEEL_FILENAME}"; \
     if [ "${CUSPARSELT_REQUIRED}" = "1" ] && ! ldconfig -p | grep -q libcusparseLt; then \
       archive=libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz; \
       curl --fail --location --retry 2 --retry-all-errors \

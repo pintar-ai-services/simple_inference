@@ -6,7 +6,9 @@ x-jetson-build: &jetson-build
     L4T_BASE: ${L4T_BASE:?Run via scripts/jetson-compose.sh}
     PYTHON_BIN: ${JETSON_PYTHON:?Run via scripts/jetson-compose.sh}
     NUMPY_VERSION: ${NUMPY_VERSION}
+    TORCH_WHEEL_FILENAME: ${TORCH_WHEEL_FILENAME:?Run via scripts/jetson-compose.sh}
     TORCH_WHEEL_URLS: ${TORCH_WHEEL_URLS:?Run via scripts/jetson-compose.sh}
+    TORCHVISION_WHEEL_FILENAME: ${TORCHVISION_WHEEL_FILENAME:?Run via scripts/jetson-compose.sh}
     TORCHVISION_WHEEL_URLS: ${TORCHVISION_WHEEL_URLS:?Run via scripts/jetson-compose.sh}
     CUSPARSELT_REQUIRED: ${CUSPARSELT_REQUIRED:?Run via scripts/jetson-compose.sh}
     CUDA_VERSION: ${CUDA_VERSION:?Run via scripts/jetson-compose.sh}

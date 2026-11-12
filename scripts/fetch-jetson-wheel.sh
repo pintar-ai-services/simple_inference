@@ -4,12 +4,18 @@
 # deliberately independently testable with a mocked curl executable.
 set -eu
 
-output=${1:?output path is required}
-urls=${2:?at least one wheel URL is required}
+output_dir=${1:?output directory is required}
+filename=${2:?wheel filename is required}
+urls=${3:?at least one wheel URL is required}
+output="${output_dir}/${filename}"
+
+case "$filename" in
+  *.whl) ;;
+  *) echo "wheel filename must end in .whl: $filename" >&2; exit 2 ;;
+esac
 
 for url in $urls; do
-  filename=${url%%\#*}
-  echo "Downloading ${filename##*/}"
+  echo "Downloading ${filename}"
   if curl --fail --location --retry 2 --retry-all-errors --output "$output" "$url"; then
     exit 0
   fi

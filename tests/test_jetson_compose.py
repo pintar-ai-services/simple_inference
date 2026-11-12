@@ -39,6 +39,8 @@ def test_resolver_selects_supported_launcher_wheels(
     assert f"JETPACK_VERSION={jetpack}" in result.stdout
     assert f"CUDA_VERSION={cuda}" in result.stdout
     assert f"L4T_BASE={base}" in result.stdout
+    assert "TORCH_WHEEL_FILENAME=torch-" in result.stdout
+    assert "TORCHVISION_WHEEL_FILENAME=torchvision-" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -71,9 +73,10 @@ def test_wheel_fetcher_uses_fallback_without_network(tmp_path: Path):
         "done\n"
     )
     fake_curl.chmod(0o755)
-    output = tmp_path / "wheel.whl"
+    output_name = "torch-2.8.0-cp310-cp310-linux_aarch64.whl"
+    output = tmp_path / output_name
     result = subprocess.run(
-        [str(FETCHER), str(output), "https://primary/wheel https://fallback/wheel"],
+        [str(FETCHER), str(tmp_path), output_name, "https://primary/wheel https://fallback/wheel"],
         env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}", "CALLS": str(calls)},
         text=True,
         capture_output=True,
@@ -94,5 +97,5 @@ def test_jetson_compose_limits_gpu_to_compute_workers():
 
 def test_dockerfile_runs_wheel_helper_without_requiring_host_execute_bits():
     dockerfile = (ROOT / "Dockerfile.jetson").read_text()
-    assert "sh /usr/local/bin/fetch-jetson-wheel /tmp/torch.whl" in dockerfile
-    assert "sh /usr/local/bin/fetch-jetson-wheel /tmp/torchvision.whl" in dockerfile
+    assert 'sh /usr/local/bin/fetch-jetson-wheel /tmp "${TORCH_WHEEL_FILENAME}"' in dockerfile
+    assert 'sh /usr/local/bin/fetch-jetson-wheel /tmp "${TORCHVISION_WHEEL_FILENAME}"' in dockerfile
