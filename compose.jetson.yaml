@@ -65,7 +65,6 @@ services:
 
   worker:
     image: simple-inference-jetson
-    build: *jetson-build
     command: python3 -m app.run_worker
     environment:
       <<: *app-environment
@@ -91,7 +90,6 @@ services:
 
   training-worker:
     image: simple-inference-jetson
-    build: *jetson-build
     command: python3 -m app.run_training_worker
     environment:
       <<: *app-environment
@@ -108,7 +106,6 @@ services:
 
   cleanup:
     image: simple-inference-jetson
-    build: *jetson-build
     command: python3 -m app.cleanup
     environment:
       UPLOAD_DIR: /data/uploads
@@ -121,7 +118,6 @@ services:
 
   coco-worker:
     image: simple-inference-jetson
-    build: *jetson-build
     command: python3 -m app.run_coco_worker
     environment: *app-environment
     volumes:
@@ -135,7 +131,6 @@ services:
 
   viewer-worker:
     image: simple-inference-jetson
-    build: *jetson-build
     command: python3 -m app.run_viewer_worker
     environment: *app-environment
     volumes:

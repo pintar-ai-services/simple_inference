@@ -89,6 +89,9 @@ def test_wheel_fetcher_uses_fallback_without_network(tmp_path: Path):
 
 def test_jetson_compose_limits_gpu_to_compute_workers():
     compose = (ROOT / "compose.jetson.yaml").read_text()
+    # Build the large ARM64 image once; every worker reuses the resulting
+    # simple-inference-jetson image instead of exporting duplicate layers.
+    assert compose.count("build: *jetson-build") == 1
     # Jetson (including JP7) receives GPU access through runtime: nvidia; the
     # two compute workers explicitly opt in, unlike the API/import stack.
     assert compose.count("runtime: nvidia") == 2
