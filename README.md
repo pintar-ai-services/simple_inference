@@ -16,6 +16,23 @@ docker compose up --build
 
 Open [http://localhost:8000](http://localhost:8000) for the transmission-line image viewer, or [http://localhost:8000/inference](http://localhost:8000/inference) for inference and tabular workflows.
 
+## Database explorer
+
+The standard CPU, NVIDIA GPU, and Jetson stacks start mongo-express automatically
+after MongoDB becomes healthy. Open [http://localhost:8081](http://localhost:8081)
+on the deployment host, or `http://<host-or-jetson-ip>:8081` from another computer
+on the local network. The default web login is `tnb-trainer` / `password`.
+
+To override the login, set `MONGO_EXPRESS_USERNAME` and `MONGO_EXPRESS_PASSWORD`
+in the project's `.env` file, then rerun your deployment's Compose command.
+These credentials protect the explorer web interface; they do not change MongoDB
+authentication. The explorer allows creating, editing, and deleting data.
+
+Open the `tnb_inference` database to inspect imported dataset records. MongoDB
+persists in the `mongo-data` volume. Imported images and other dataset files
+remain under `./data` (including `data/viewer` and `data/coco`); mongo-express
+does not browse those files. Dataset collections appear after data is imported.
+
 ## Transmission-line image viewer
 
 The landing-page viewer uses the supplied public Backblaze archive:
