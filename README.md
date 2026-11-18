@@ -1,6 +1,6 @@
 # TNB Inference
 
-TNB Inference is a small asynchronous PyTorch demo with a Pascal VOC transmission-line image viewer, image classification, object detection, and numeric tabular-model training.
+TNB Inference is a small asynchronous PyTorch demo with a Pascal VOC transmission-line image viewer, image classification, object detection, and configurable ANN inference.
 
 ```text
 browser → FastAPI → Redis/RQ queue → worker → database/files → browser
@@ -14,7 +14,7 @@ Prerequisites: Docker Compose and roughly 3 GB of free disk/RAM for the initial 
 docker compose up --build
 ```
 
-Open [http://localhost:8000](http://localhost:8000) for the transmission-line image viewer, or [http://localhost:8000/inference](http://localhost:8000/inference) for inference and tabular workflows.
+Open [http://localhost:8000](http://localhost:8000) for the transmission-line image viewer, or [http://localhost:8000/inference](http://localhost:8000/inference) for object detection, CNN classification, and ANN inference.
 
 ## Database explorer
 
@@ -41,7 +41,7 @@ The landing-page viewer uses the supplied public Backblaze archive:
 https://f005.backblazeb2.com/file/jetson-assets/dataset/transmission%20line%20obj%20det.zip
 ```
 
-Select **Load transmission-line dataset** in the viewer to queue a download and import. The importer runs independently from inference/training workers, shows progress in the page, stores its files under `data/viewer`, and does not touch legacy datasets under `data/coco`.
+Select **Load transmission-line dataset** in the viewer to queue a download and import. The importer runs independently from inference workers, shows progress in the page, stores its files under `data/viewer`, and does not touch legacy datasets under `data/coco`.
 
 The archive is Pascal VOC style: every annotated image has an XML file in an `Annotations/` directory and its image in the sibling `JPEGImages/` directory. XML labels are retained exactly as authored. Invalid image/XML pairs are skipped and reported after import.
 
@@ -74,9 +74,98 @@ The script uploads to the running local API, queues the import, waits for comple
 | `POST /jobs` | Multipart field `image`; queues object detection. |
 | `POST /classification/jobs` | Multipart image; queues ResNet-50 classification. |
 | `GET /jobs/{job_id}` | Returns job state and result when finished. |
-| `POST /tabular/datasets` | Upload a CSV/XLSX/XLS file and return its preview. |
-| `POST /tabular/training-jobs` | Queue ANN training from an uploaded table. |
+| `GET /ann/models` | Default ANN, registered model metadata/examples, and configuration errors. |
+| `POST /ann/models/{model_id}/jobs` | Queue numeric ANN inference with JSON `{"features": {...}}`. |
+| `POST /ann/models/{model_id}/image-jobs` | Queue image ANN inference with multipart field `image`. |
 | `GET /health` | Checks Redis and that an inference worker is available. |
+
+## ANN inference
+
+Open **AI Inference → ANN Inference**. PIMA Predict is included: select **Load
+example**, then **Run prediction**. Training takes place in the notebooks, outside
+the serving app. Prediction requests use the existing Redis/RQ inference worker.
+
+The default bundle in `models/pima/` contains two files:
+
+- `model.pt`: trained PyTorch weights.
+- `model.json`: architecture, ordered input names, fitted scaler, labels,
+  output interpretation, example input, and training/evaluation metadata.
+
+The included model follows the PIMA reference notebook (seed 42, stratified
+80/20 split, 100 epochs). Its measured held-out accuracy is **74.03%** on 154
+samples. It is an educational dataset classifier. These model files need no
+training or dataset download when the application starts. The separate public
+vision workflows may still download their pretrained weights on first startup.
+
+### Deploy your notebook model
+
+1. Complete the notebook exercises, train and evaluate, then run **Export for deployment**.
+2. Copy **both** generated files into `models/<model_id>/`, keeping the folder
+   name equal to `model_id` in the generated JSON. For example, MNIST exports to
+   `deployment/mnist/`; copy its two files to `models/mnist/` in this repository.
+3. Register the folder in `config/ann.json`:
+
+   ```json
+   {
+     "default_model": "pima",
+     "models": ["pima", "mnist"]
+   }
+   ```
+
+4. Restart both services and reload the page:
+
+   ```bash
+   docker compose restart api worker
+   ```
+
+Use the same Compose files or Jetson wrapper as your original startup when
+restarting a GPU/Jetson deployment. For an existing installation upgrading from
+the training workflow, first rebuild using your normal startup command with
+`--build --remove-orphans`; this removes the old training-worker container.
+Existing files under `data/tabular/` are preserved but are no longer served.
+
+Only registered models appear in the selector. PIMA and Iris-style models use
+numeric fields; MNIST uses image upload and shows the exact processed grayscale
+image after prediction. **Load example** uses the sample stored in the bundle.
+The Iris reference notebook exports its four raw `F1`–`F4` features without
+scaling and preserves its `LabelEncoder` class order. PIMA exports its fitted
+scaler; each bundle uses the preprocessing from its own training notebook.
+
+Always replace both files together after retraining. Registration and metadata
+are read at startup; networks load once per worker process. If a bundle is
+missing or invalid, the page reports what to fix. An invalid default never
+silently switches to another model. Correct the files and restart both services.
+
+The runtime supports the notebooks' sequential Linear/ReLU/Flatten networks
+(up to 10 million parameters), float32 numeric input with no scaling or saved
+standard scaling, and single-channel images with bilinear resizing, optional
+inversion, and pixel scaling. Binary logits use sigmoid and the exported
+threshold; multiclass logits use softmax; scalar regression returns a number.
+MNIST expects a light digit on a dark background, matching its training images.
+
+Compose mounts `config/` and `models/` read-only into the API and worker. Standalone
+Docker images also include the default files. To change their locations outside
+Compose, set `ANN_CONFIG` and `ANN_MODEL_DIR` consistently for both processes.
+The old `/tabular/*` training endpoints have been removed.
+
+### Reproduce the default PIMA bundle (optional)
+
+Use a separate Python environment with CPU PyTorch installed:
+
+```bash
+python -m venv .tmp/pima-generation
+.tmp/pima-generation/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+.tmp/pima-generation/bin/pip install -r requirements-generation.txt
+.tmp/pima-generation/bin/python scripts/generate_pima_bundle.py
+```
+
+The script supplies the intended exercise answers in memory, executes the PIMA
+notebook headlessly, and uses its export cell without editing the student
+notebook. It downloads the notebook's CSV and checks its recorded SHA-256;
+`--dataset /path/to/diabetes.csv` uses a local copy instead. `--output-dir` chooses
+an alternate destination. Generation dependencies are not installed in serving
+containers. Exact training results may differ across PyTorch versions/devices;
+the included JSON records the actual version, device, and measured accuracy.
 
 ## NVIDIA GPU mode
 
@@ -108,8 +197,8 @@ larger persistent mount:
 JETSON_TMPDIR=/mnt/ssd/compose-tmp ./scripts/jetson-compose.sh up --build
 ```
 
-Only the inference and training workers use the NVIDIA runtime; the API and
-import services do not reserve GPU access.
+Only the inference worker uses the NVIDIA runtime; the API and import services
+do not reserve GPU access.
 
 The command starts the full stack and exposes the application at port 8000.
 The first build downloads PyTorch and the first inference request downloads the

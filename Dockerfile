@@ -19,3 +19,6 @@ RUN pip install --index-url https://download.pytorch.org/whl/${PYTORCH_WHEEL_CHA
     && pip install -r requirements.txt
 
 COPY app ./app
+
+COPY config ./config
+COPY models ./models

@@ -34,10 +34,14 @@ def test_frontend_includes_classification_and_ann_workflows():
 
     assert "ResNet-50" in source
     assert "ImageNet-1K" in source
-    assert "Train from CSV or Excel" in source
+    assert "ANN Inference" in source
+    assert "Load example" in source
+    assert 'id="ann-model"' in source
+    assert "Train from CSV or Excel" not in source
     assert "/classification/jobs" in script
-    assert "/tabular/training-jobs" in script
-    assert "/tabular/predictions" in script
+    assert "/ann/models" in script
+    assert "image-jobs" in script
+    assert "/tabular/" not in script
 
 
 def test_detection_results_stay_in_the_existing_upload_and_model_cards():

@@ -66,3 +66,6 @@ RUN set -eu; \
     ${PYTHON_BIN} -c 'import torch, torchvision; print(f"Jetson PyTorch installed: torch={torch.__version__}, torchvision={torchvision.__version__}, CUDA={torch.version.cuda}")'
 
 COPY app ./app
+
+COPY config ./config
+COPY models ./models

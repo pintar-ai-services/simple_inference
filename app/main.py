@@ -4,6 +4,7 @@ import io
 import json
 import os
 import zipfile
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -18,10 +19,10 @@ from rq import Queue
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 
-from app.queueing import has_coco_worker, has_inference_worker, has_training_worker, has_viewer_worker, redis_connection
+from app.queueing import has_coco_worker, has_inference_worker, has_viewer_worker, redis_connection
 from app.coco import database as coco_database, image_details as coco_image_details, image_root as coco_image_root, import_coco2017, list_images as coco_list_images, status as coco_status
 from app import viewer
-from app.tabular import dataset_path, preview_dataset, predict_latest, train_tabular_model
+from app import ann
 from app.worker import classify, detect
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -32,12 +33,17 @@ upload_dir = Path(os.environ.get("UPLOAD_DIR", "data/uploads"))
 upload_dir.mkdir(parents=True, exist_ok=True)
 redis = redis_connection()
 queue = Queue("inference", connection=redis, default_timeout=300)
-training_queue = Queue("training", connection=redis, default_timeout=3600)
 coco_queue = Queue("coco-import", connection=redis, default_timeout=86400)
 viewer_queue = Queue("viewer-import", connection=redis, default_timeout=86400)
 MAX_VIEWER_ARCHIVE_BYTES = int(os.environ.get("VIEWER_MAX_ARCHIVE_BYTES", str(2 * 1024 * 1024 * 1024)))
 
-app = FastAPI(title="TNB Inference")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    ann.registry()  # Snapshot registration at startup; restart to deploy changes.
+    yield
+
+
+app = FastAPI(title="TNB Inference", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/public", StaticFiles(directory="app/public"), name="public")
 
@@ -62,12 +68,11 @@ def health() -> dict:
     try:
         redis.ping()
         worker_ready = has_inference_worker(redis)
-        training_ready = has_training_worker(redis)
     except RedisError as error:
         raise HTTPException(status_code=503, detail="Redis is unavailable") from error
     if not worker_ready:
         raise HTTPException(status_code=503, detail="No inference worker is available")
-    return {"status": "ok", "worker": "ready", "training_worker": "ready" if training_ready else "unavailable"}
+    return {"status": "ok", "worker": "ready"}
 
 
 async def save_image_upload(image: UploadFile) -> str:
@@ -126,94 +131,63 @@ async def create_classification_job(image: UploadFile = File(...)) -> dict:
     return {"job_id": job_id, "status": "queued"}
 
 
-class TrainingRequest(BaseModel):
-    dataset_id: str
-    sheet: str
-    target: str
-    task: str
-
-
-class PredictionRequest(BaseModel):
+class AnnPredictionRequest(BaseModel):
     features: dict[str, object]
 
 
-@app.post("/tabular/datasets", status_code=201)
-async def upload_tabular_dataset(dataset: UploadFile = File(...)) -> dict:
-    suffix = Path(dataset.filename or "").suffix.lower()
-    if suffix not in {".csv", ".xlsx", ".xls"}:
-        raise HTTPException(status_code=400, detail="Upload a CSV or Excel (.xlsx, .xls) file.")
-    content = await dataset.read(MAX_UPLOAD_BYTES + 1)
-    if not content:
-        raise HTTPException(status_code=400, detail="Please choose a dataset file.")
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Dataset files must be 10 MB or smaller.")
-    from app.tabular import dataset_dir
-    dataset_id = str(uuid4())
-    saved = dataset_dir() / f"{dataset_id}{suffix}"
-    saved.write_bytes(content)
+@app.get("/ann/models")
+def ann_models() -> dict:
+    return ann.registry().catalog()
+
+
+def configured_ann(model_id: str, input_type: str) -> dict:
     try:
-        preview = preview_dataset(saved)
-    except (ValueError, OSError, UnicodeDecodeError) as error:
-        saved.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Could not read the dataset: {error}") from error
-    (dataset_dir() / f"{dataset_id}.json").write_text(json.dumps({"filename": dataset.filename or saved.name}))
-    return {"dataset_id": dataset_id, "filename": dataset.filename, **preview}
+        config = ann.registry().get(model_id)
+    except ann.AnnConfigurationError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="ANN model is not registered.") from error
+    if config["input"]["type"] != input_type:
+        raise HTTPException(status_code=400, detail=f"This model requires {config['input']['type']} input.")
+    return config
 
 
-@app.get("/tabular/datasets/{dataset_id}/preview")
-def get_dataset_preview(dataset_id: str, sheet: str | None = None) -> dict:
-    path = dataset_path(dataset_id)
-    if path is None:
-        raise HTTPException(status_code=404, detail="Dataset not found or it has expired.")
+def require_ann_worker() -> None:
     try:
-        return preview_dataset(path, sheet)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-
-
-@app.post("/tabular/training-jobs", status_code=202)
-def create_training_job(request: TrainingRequest) -> dict:
-    path = dataset_path(request.dataset_id)
-    if path is None:
-        raise HTTPException(status_code=404, detail="Dataset not found or it has expired.")
-    if request.task not in {"classification", "regression"}:
-        raise HTTPException(status_code=400, detail="Task must be classification or regression.")
-    try:
-        preview = preview_dataset(path, request.sheet)
-        if request.target not in {column["name"] for column in preview["columns"]}:
-            raise ValueError("Select a target column from the dataset preview.")
-        if not has_training_worker(redis):
-            raise HTTPException(status_code=503, detail="No training worker is available. Try again shortly.")
+        if not has_inference_worker(redis):
+            raise HTTPException(status_code=503, detail="No inference worker is available. Try again shortly.")
     except RedisError as error:
         raise HTTPException(status_code=503, detail="Redis is unavailable") from error
+
+
+@app.post("/ann/models/{model_id}/jobs", status_code=202)
+def create_ann_job(model_id: str, request: AnnPredictionRequest) -> dict:
+    config = configured_ann(model_id, "tabular")
+    try:
+        ann.numeric_input(config, request.features)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    original_name = json.loads((path.parent / f"{request.dataset_id}.json").read_text())["filename"]
+    require_ann_worker()
     job_id = str(uuid4())
     try:
-        training_queue.enqueue(train_tabular_model, path.name, original_name, request.sheet, request.target, request.task, job_id=job_id, result_ttl=3600, failure_ttl=86400)
+        queue.enqueue(ann.predict, model_id, features=request.features, job_id=job_id, result_ttl=3600, failure_ttl=86400)
     except RedisError as error:
-        raise HTTPException(status_code=503, detail="Could not queue the training job.") from error
+        raise HTTPException(status_code=503, detail="Could not queue the ANN job.") from error
     return {"job_id": job_id, "status": "queued"}
 
 
-@app.get("/tabular/model")
-def get_tabular_model() -> dict:
-    from app.tabular import latest_metadata
-    metadata = latest_metadata()
-    if metadata is None:
-        raise HTTPException(status_code=404, detail="No ANN model has been trained yet.")
-    return metadata
-
-
-@app.post("/tabular/predictions")
-def create_tabular_prediction(request: PredictionRequest) -> dict:
+@app.post("/ann/models/{model_id}/image-jobs", status_code=202)
+async def create_ann_image_job(model_id: str, image: UploadFile = File(...)) -> dict:
+    configured_ann(model_id, "image")
+    require_ann_worker()
+    filename = await save_image_upload(image)
+    job_id = Path(filename).stem
     try:
-        return predict_latest(request.features)
-    except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+        queue.enqueue(ann.predict, model_id, image_filename=filename, job_id=job_id, result_ttl=3600, failure_ttl=86400)
+    except RedisError as error:
+        (upload_dir / filename).unlink(missing_ok=True)
+        raise HTTPException(status_code=503, detail="Could not queue the ANN image job.") from error
+    return {"job_id": job_id, "status": "queued"}
 
 
 def get_coco_database():
@@ -400,5 +374,5 @@ def get_job(job_id: str) -> dict:
     if status_value == "finished":
         response["result"] = job.result
     elif status_value == "failed":
-        response["error"] = "Job failed. Check the worker logs for details."
+        response["error"] = job.meta.get("ann_error") or "Job failed. Check the worker logs for details."
     return response

@@ -93,9 +93,9 @@ def test_jetson_compose_limits_gpu_to_compute_workers():
     # simple-inference-jetson image instead of exporting duplicate layers.
     assert compose.count("build: *jetson-build") == 1
     # Jetson (including JP7) receives GPU access through runtime: nvidia; the
-    # two compute workers explicitly opt in, unlike the API/import stack.
-    assert compose.count("runtime: nvidia") == 2
-    assert compose.count("NVIDIA_VISIBLE_DEVICES: all") == 2
+    # inference worker explicitly opts in, unlike the API/import stack.
+    assert compose.count("runtime: nvidia") == 1
+    assert compose.count("NVIDIA_VISIBLE_DEVICES: all") == 1
 
 
 def test_dockerfile_runs_wheel_helper_without_requiring_host_execute_bits():

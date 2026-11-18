@@ -16,8 +16,8 @@ x-jetson-build: &jetson-build
 x-app-environment: &app-environment
   REDIS_URL: redis://redis:6379/0
   UPLOAD_DIR: /data/uploads
-  TABULAR_DATASET_DIR: /data/tabular/datasets
-  TABULAR_MODEL_DIR: /data/tabular/models
+  ANN_CONFIG: /app/config/ann.json
+  ANN_MODEL_DIR: /app/models
   MONGODB_URL: mongodb://mongodb:27017
   COCO_DATABASE: tnb_inference
   COCO_DATA_DIR: /data/coco
@@ -71,6 +71,8 @@ services:
     environment: *app-environment
     volumes:
       - ./data:/data
+      - ./config:/app/config:ro
+      - ./models:/app/models:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -91,6 +93,8 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ./data:/data
+      - ./config:/app/config:ro
+      - ./models:/app/models:ro
       - torch-model-cache:/models
     depends_on:
       redis:
@@ -103,28 +107,11 @@ services:
       timeout: 5s
       retries: 6
 
-  training-worker:
-    image: simple-inference-jetson
-    command: python3 -m app.run_training_worker
-    environment:
-      <<: *app-environment
-      INFERENCE_DEVICE: cuda
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    volumes:
-      - ./data:/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    runtime: nvidia
-
   cleanup:
     image: simple-inference-jetson
     command: python3 -m app.cleanup
     environment:
       UPLOAD_DIR: /data/uploads
-      TABULAR_DATASET_DIR: /data/tabular/datasets
       UPLOAD_RETENTION_SECONDS: "86400"
       CLEANUP_INTERVAL_SECONDS: "3600"
     volumes:

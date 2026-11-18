@@ -4,10 +4,12 @@ from __future__ import annotations
 from rq import SimpleWorker
 
 from app.queueing import redis_connection
+from app.ann import registry
 from app.worker import preload_model, resolve_device
 
 
 def main() -> None:
+    registry()
     device = resolve_device()
     # SimpleWorker avoids forking a process that has imported/initialized PyTorch.
     # The first job moves this model to CUDA when GPU mode is selected.

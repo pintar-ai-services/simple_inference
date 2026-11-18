@@ -20,10 +20,6 @@ def has_inference_worker(connection: Redis) -> bool:
     return has_worker(connection, "inference")
 
 
-def has_training_worker(connection: Redis) -> bool:
-    return has_worker(connection, "training")
-
-
 def has_coco_worker(connection: Redis) -> bool:
     return has_worker(connection, "coco-import")
 

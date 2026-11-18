@@ -46,8 +46,8 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       UPLOAD_DIR: /data/uploads
-      TABULAR_DATASET_DIR: /data/tabular/datasets
-      TABULAR_MODEL_DIR: /data/tabular/models
+      ANN_CONFIG: /app/config/ann.json
+      ANN_MODEL_DIR: /app/models
       MONGODB_URL: mongodb://mongodb:27017
       COCO_DATABASE: tnb_inference
       COCO_DATA_DIR: /data/coco
@@ -55,6 +55,8 @@ services:
       VIEWER_DATA_DIR: /data/viewer
     volumes:
       - ./data:/data
+      - ./config:/app/config:ro
+      - ./models:/app/models:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -72,12 +74,16 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       UPLOAD_DIR: /data/uploads
+      ANN_CONFIG: /app/config/ann.json
+      ANN_MODEL_DIR: /app/models
       SCORE_THRESHOLD: "0.5"
       INFERENCE_DEVICE: cpu
       TORCH_HOME: /models
       PYTORCH_NVML_BASED_CUDA_CHECK: "1"
     volumes:
       - ./data:/data
+      - ./config:/app/config:ro
+      - ./models:/app/models:ro
       - torch-model-cache:/models
     depends_on:
       redis:
@@ -89,31 +95,11 @@ services:
       timeout: 5s
       retries: 6
 
-  training-worker:
-    image: simple-inference-worker-cpu
-    build:
-      context: .
-      args:
-        PYTORCH_WHEEL_CHANNEL: cpu
-    command: python -m app.run_training_worker
-    environment:
-      REDIS_URL: redis://redis:6379/0
-      INFERENCE_DEVICE: cpu
-      TABULAR_DATASET_DIR: /data/tabular/datasets
-      TABULAR_MODEL_DIR: /data/tabular/models
-    volumes:
-      - ./data:/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
   cleanup:
     build: .
     command: python -m app.cleanup
     environment:
       UPLOAD_DIR: /data/uploads
-      TABULAR_DATASET_DIR: /data/tabular/datasets
       UPLOAD_RETENTION_SECONDS: "86400"
       CLEANUP_INTERVAL_SECONDS: "3600"
     volumes:

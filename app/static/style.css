@@ -98,20 +98,14 @@ footer { padding-top: 32px; color: #71879c; text-align: center; font-size: .72re
 .panel-heading { margin: 0 0 18px; }
 .panel-heading h3 { margin: 0; color: #073f78; font-size: 1.25rem; letter-spacing: -.03em; }
 .panel-heading p { margin: 6px 0 0; color: #526d86; font-size: .86rem; }
-.info-card h3, .training-panel h3 { margin: 0 0 10px; color: #073f78; font-size: 1rem; }
 .job-status { margin: 14px 0 0; padding: 10px 13px; border-radius: 10px; background: #edf5fb; color: #456681; font-size: .8rem; }
 .prediction-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .prediction-list li, .prediction-output { padding: 11px 13px; border: 1px solid #d3e2ed; border-radius: 9px; background: #fff; color: #315676; font-size: .84rem; }
-.training-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; padding: 22px; border: 1px solid #d5e1eb; border-radius: 18px; background: #fff; box-shadow: 0 16px 35px #174a7612; }
-.training-panel h3, .training-panel > p, .training-panel .table-wrap, .training-panel button, .prediction-output { grid-column: 1 / -1; }
-.training-panel label { display: grid; gap: 6px; color: #315676; font-size: .78rem; font-weight: 700; }
-.training-panel input, .training-panel select { width: 100%; border: 1px solid #bfd4e5; border-radius: 8px; padding: 10px; background: #f9fcff; color: #193e63; font: inherit; }
 .table-wrap { overflow: auto; max-height: 300px; border: 1px solid #d5e1eb; border-radius: 10px; }
 .table-wrap table { width: 100%; border-collapse: collapse; font-size: .76rem; }
 .table-wrap th, .table-wrap td { padding: 8px 10px; border-bottom: 1px solid #e4edf4; text-align: left; white-space: nowrap; }
 .table-wrap th { position: sticky; top: 0; background: #eaf4fb; color: #073f78; }
 .prediction-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; grid-column: 1 / -1; }
-@media (max-width: 760px) { .training-panel, .prediction-fields { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .workflow-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .viewer-controls { display: flex; align-items: end; gap: 12px; margin-bottom: 16px; }
 .download-progress { margin-top: 14px; }
@@ -153,3 +147,22 @@ footer { padding-top: 32px; color: #71879c; text-align: center; font-size: .72re
 @media (max-width: 760px) { .topbar { flex-wrap: wrap; } .page-nav { order: 3; width: 100%; margin-left: 0; } .page-nav a { flex: 1; text-align: center; } }
 @media (max-width: 560px) { .brand { gap: 10px; } .brand-logo { width: 124px; } .brand-name { padding-left: 10px; font-size: .92rem; } }
 @media (max-width: 480px) { .app-shell { width: min(100% - 24px, 1120px); padding-top: 16px; } .model-badge { font-size: .62rem; } .hero { min-height: 225px; } .hero h1 { font-size: 2.75rem; } .hero-orb { display: none; } .upload-card { padding: 18px; } .status-detail { display: none; } .brand-name { display: none; } .brand-logo { width: 142px; } }
+
+.ann-model-label, #ann-fields label { display: grid; gap: 6px; color: #315676; font-size: .8rem; font-weight: 700; }
+.ann-model-label { margin-top: 24px; }
+.ann-model-label select, #ann-fields input { width: 100%; padding: 10px; border: 1px solid #bfd4e5; border-radius: 8px; background: #f9fcff; color: #193e63; font: inherit; }
+#ann-input-description { color: #526d86; font-size: .85rem; line-height: 1.6; }
+.ann-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.ann-actions button { flex: 1; }
+#ann-example { background: #e8f2fa; color: #0067b5; box-shadow: none; }
+.ann-details { margin-top: 20px; color: #526d86; font-size: .85rem; line-height: 1.7; }
+.ann-details summary { cursor: pointer; color: #073f78; font-weight: 700; }
+.ann-image-preview { display: block; width: 100%; max-height: 240px; object-fit: contain; background: #101820; }
+#ann-processed { margin: 20px 0 0; }
+#ann-processed img { width: 112px; height: 112px; object-fit: contain; image-rendering: pixelated; background: black; border-radius: 8px; }
+#ann-processed figcaption { margin-top: 8px; font-size: .8rem; color: #526d86; }
+#ann-result-model { font-size: .8rem; color: #526d86; }
+.info-card h3 { margin: 0 0 10px; color: #073f78; font-size: 1rem; }
+@media (max-width: 760px) { .prediction-fields { grid-template-columns: 1fr; } }
+.ann-image-preview[hidden] { display: none; }
+#panel-ann .info-card { display: block; }
