@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "model_id": "pima",
+  "display_name": "PIMA Predict",
+  "model_version": "1",
+  "framework": "pytorch",
+  "pytorch_version": "2.15.0+cpu",
+  "weights": {
+    "file": "model.pt",
+    "format": "state_dict"
+  },
+  "architecture": {
+    "type": "sequential",
+    "layers": [
+      {
+        "type": "linear",
+        "in_features": 8,
+        "out_features": 16,
+        "bias": true
+      },
+      {
+        "type": "relu"
+      },
+      {
+        "type": "linear",
+        "in_features": 16,
+        "out_features": 8,
+        "bias": true
+      },
+      {
+        "type": "relu"
+      },
+      {
+        "type": "linear",
+        "in_features": 8,
+        "out_features": 1,
+        "bias": true
+      }
+    ]
+  },
+  "input": {
+    "type": "tabular",
+    "dtype": "float32",
+    "shape": [
+      null,
+      8
+    ],
+    "features": [
+      "Pregnancies",
+      "Glucose",
+      "BloodPressure",
+      "SkinThickness",
+      "Insulin",
+      "BMI",
+      "DiabetesPedigreeFunction",
+      "Age"
+    ],
+    "preprocessing": {
+      "type": "standard_scaler",
+      "mean": [
+        3.8192182410423454,
+        120.90879478827361,
+        69.44299674267101,
+        20.77687296416938,
+        78.66612377850163,
+        31.973289902280115,
+        0.47742833876221474,
+        33.36644951140065
+      ],
+      "scale": [
+        3.3114482165863706,
+        31.535381414498357,
+        18.387588970636795,
+        15.843515694762367,
+        107.6488028180856,
+        7.854959838378326,
+        0.3300311907747674,
+        11.823797902547419
+      ]
+    }
+  },
+  "output": {
+    "task": "binary_classification",
+    "shape": [
+      null,
+      1
+    ],
+    "target": "Outcome",
+    "labels": [
+      "No Diabetes",
+      "Diabetes"
+    ],
+    "postprocessing": {
+      "type": "sigmoid",
+      "threshold": 0.5,
+      "positive_class_index": 1
+    }
+  },
+  "example": {
+    "features": {
+      "Pregnancies": 6.0,
+      "Glucose": 148.0,
+      "BloodPressure": 72.0,
+      "SkinThickness": 35.0,
+      "Insulin": 0.0,
+      "BMI": 33.6,
+      "DiabetesPedigreeFunction": 0.627,
+      "Age": 50.0
+    }
+  },
+  "training": {
+    "seed": 42,
+    "test_split": 0.2,
+    "stratified": true,
+    "epochs": 100,
+    "optimizer": "Adam",
+    "learning_rate": 0.01,
+    "loss": "BCEWithLogitsLoss",
+    "device": "cpu",
+    "dataset_url": "https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv",
+    "dataset_sha256": "698c203a14aa31941d2251175330c9199f3ccdb31597abbba2a3e35416257a72"
+  },
+  "metrics": {
+    "test_accuracy": 0.7402597402597403
+  }
+}

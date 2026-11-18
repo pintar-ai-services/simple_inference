@@ -1,0 +1,4 @@
+{
+  "default_model": "pima",
+  "models": ["pima"]
+}
